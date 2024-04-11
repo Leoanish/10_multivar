@@ -80,7 +80,7 @@ Commonly not a "designed experiment" analysis, but an exploratory relationship a
     - Supervised  
     - Unsupervised  
 
-- If Y exists, based on its type:  -random forest can do both
+- If Y exists, based on its type:  
     - Categorical: classification  
     - Numerical: regression  
 
@@ -89,9 +89,9 @@ Commonly not a "designed experiment" analysis, but an exploratory relationship a
 #| message: false
 #| warning: false
 
-#install.packages("ggcorrplot") # visualize correlation matrix
-#install.packages("factoextra") #
-#install.packages("ggpmisc") #
+#install.packages("ggcorrplot")
+#install.packages("factoextra")
+#install.packages("ggpmisc")
 
 library(tidyverse)
 library(ggcorrplot)
@@ -116,22 +116,23 @@ Let's create a correlation matrix
 # Estimating significance matrix
 p.mat <- weather %>% 
   dplyr::select(-year, -site) %>% 
-  cor_pmat()
+  cor_pmat() %>% 
+  as.data.frame()
 
 p.mat
 ```
 
 Plotting  
-```{r correlation matrix plot}
+```{r correlation matrix plot, fig.height=7, fig.width=9}
 weather %>%
   dplyr::select(-year, -site) %>%
   cor() %>%
   ggcorrplot(hc.order = TRUE, 
              digits = 1,
-             type = "lower", #lower side of the correlation matrix
+             type = "lower", 
              p.mat = p.mat, 
              sig.level = 0.05,
-             insig = "blank", #blank if non significant
+             insig = "blank",
              lab = TRUE)
 
 ggsave("../output/corrmat.png",
@@ -248,19 +249,17 @@ weather %>%
   ggplot(aes(x = mean_dayl.s_Apr, 
              y = mean_dayl.s_May))+
   geom_point() +
-  geom_smooth(method="lm")+
-  stat_correlation()
+  geom_smooth(method="lm") +
+  stat_poly_eq()
 
 ```
 
 Now let's fit some models with one or two uncorrelated and correlated variables explaining fiberstrength and see what happens.  
 
 ```{r strength ~ mean_dayl.s_Apr}
-lm_dayl.apr <- lm(strength_gtex ~ mean_dayl.s_Apr, 
-                  data = weather
-                  ) %>% 
+lm_dayl.apr <- lm(strength_gtex ~ mean_dayl.s_Apr, data = weather) %>% 
   tidy() %>% 
-  filter(term != "(Intercept)") %>% 
+  filter(row_number() == 2) %>% 
   mutate(mod = "lm_dayl.apr")
 
 lm_dayl.apr
@@ -313,11 +312,8 @@ lm_dayl.apr %>%
                              "lm_2var.cor"))) %>%
   filter(term != "mean_dayl.s_May") %>%
   ggplot(aes(x=mod))+
-  geom_pointrange(aes(y = estimate, 
-                      ymin = estimate - std.error, 
-                      ymax = estimate + std.error
-                      ))+
-  facet_wrap(~term, scales = "free_y")+
+  geom_pointrange(aes(y = estimate, ymin = estimate - std.error, ymax = estimate + std.error))+
+  facet_wrap(~term)+
   scale_x_discrete(guide = guide_axis(n.dodge = 2))
 
 ```
@@ -340,7 +336,6 @@ lm(strength_gtex ~ mean_dayl.s_Apr +
                    sum_prcp.mm_Oct,
    data = weather) %>% 
   vif()
-# vif is 1, which shows no multicolinearity issue 
 ```
 
 
@@ -350,7 +345,7 @@ lm(strength_gtex ~ mean_dayl.s_Apr +
                   mean_dayl.s_May,
    data = weather) %>%
   vif()
-# vif is very high, very highly multicolinear
+# The value is higher for the multicolinearity
 ```
 
 ## Dealing with multicollinearity  
@@ -376,8 +371,7 @@ Some analysis do the normalization for you (like PCA), and others don't (like k-
 
 Since both PCA and k-means only take numerical variables, let's select them now.  
 ```{r selecting only numerical vars}
-weather_n <- weather %>% 
-  dplyr::select(-c(year:strength_gtex))
+weather_n 
 
 weather_n
 ```
@@ -408,23 +402,19 @@ Some PCA properties:
 
 ```{r pca in action}
 knitr::include_graphics("https://miro.medium.com/v2/resize:fit:1200/1*V4H3Cu8qGr_90WANKSO9BA.gif")
-#the larger the eigencector, the larger the variability
 ```
 Let's run PCA for our weather data.  
 
 ```{r pca model}
-mod_pca <- prcomp(weather_n, scale. = T)
-#scale is to standardize 
+mod_pca 
 
-summary(mod_pca)
 ```
 
 ## Choosing number of PCs  
 Based on scree plot (total variance):  
 ```{r pca checking number of components}
 # Scree plot
-fviz_eig(mod_pca,
-         addlables = T)
+
 ```
     
 PCs 1 and 2 explain ~35% and ~26% (61%) of total variance.
@@ -432,13 +422,7 @@ This indicates that original variables were correlated (as we expected).
 
 If wanted to use enough PCs to explain 70% of total variance, how many would we need?  
 ```{r PCs to explain 70pct variance}
-mod_pca %>% 
-  get_eig() %>% 
-  mutate(pc = 1:nrow(.)) %>% 
-  ggplot(aes(x = pc,
-             y = cumulative.variance.percent))+
-  geom_bar(stat = 'identity')+
-  geom_hline(yintercept = 70)
+
 
 ```
     
@@ -446,7 +430,7 @@ We would need 4 PCs.
 Normally we wish to use 2-3 PCs, but 4 is certainly better than 72 original variables.  
 
 ## Inspecting PCs  
-Let's inspect PC1 through the loading (weights) of each variable towards it.  
+Let's inspect PC1 through the loadings (weights) of each variable towards it.  
 
 What are the weights that each variable received in this PC?  
 ```{r PC1 weights}
@@ -467,9 +451,7 @@ mod_pca$rotation %>%
 Which variables contributed most to PC1, regardless of direction?  
 
 ```{r variables contributing to PC1}
-fviz_contrib(mod_pca,
-             choice = 'var',
-             axes = 1)
+
 ```
   
 Let's check the eigenvectors for both PCs 1 and 2 variables:  
@@ -478,8 +460,7 @@ Let's check the eigenvectors for both PCs 1 and 2 variables:
 fviz_pca_var(mod_pca, 
              col.var = "contrib", # Color by contributions to the PC
              gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
-             repel = TRUE,     # Avoid text overlapping
-             select.var = list(contrib = 5)
+             repel = TRUE     # Avoid text overlapping
              )
 
 ```
@@ -489,10 +470,9 @@ The longer is the eigenvector for a given variable, the more important it is tow
 Let's plot PC1 vs PC2 scores, look for any groupings.  
 
 ```{r PC1 vs PC2}
-fviz_pca_ind(mod_pca,
-             label = F) #also called biplot
-```
 
+```
+  
 Appears that some groups exist.  
 
 
@@ -507,22 +487,18 @@ Let's add the first 4 PCs to our original dataset and run a regression versus gr
 
 ```{r pca scores}
 # Extract first 4 PCs scores
-pca_scores <- mod_pca$x %>% 
-  as.data.frame() %>% 
-  dplyr::select(PC1:PC4)
+pca_scores 
 
 pca_scores
 ```
 
 ```{r pca regression}
 # Adding PCs 1-4 scores to original data set
-weather_postpca <- weather %>% 
-  bind_cols(pca_scores)
+weather_postpca 
 
 # Regression of yield ~ PCs
 
-lm_pca <- lm(strength_gtex ~ PC1 + PC2 +PC3 +PC4,
-             data = weather_postpca)
+lm_pca 
 
 # Summary  
 summary(lm_pca)
@@ -531,17 +507,12 @@ summary(lm_pca)
 
 ```{r pca regression}
 # Checking VIF
-vif(lm_pca) #should be one, since we used PCA (orthogonal), even though we use all 75 PCs, they will have vif of one.
+
 ```
 
 ```{r pca regression plots}
 # Plotting strength vs PC1
-ggplot(weather_postpca,
-       aes(x = PC1,
-           y = strength_gtex)
-       )+
-  geom_point()+
-  geom_smooth(method = "lm")
+
 ```
 
 
@@ -551,7 +522,7 @@ ggplot(weather_postpca,
        aes(x = PC2, y = strength_gtex))+
   geom_point()+
   geom_smooth(method = "lm")
-# looks linear relationship but noisy. From summary its significant
+
 ```
 
 ```{r pca regression plots}
@@ -560,7 +531,7 @@ ggplot(weather_postpca,
        aes(x = PC3, y = strength_gtex))+
   geom_point()+
   geom_smooth(method = "lm")
-# looks linear negative relationship but noisy. From summary its significant
+
 ```
 
 Only PCs 2 and 3 explained strength (look at which variables were most important to each PC for interpretation).  
@@ -602,8 +573,7 @@ k-means does not normalize our data for us like PCA did, so we will need to do t
 
 ```{r}
 # normalizing the data
-weather_norm  <- weather_n %>% 
-  mutate(across(everything(), ~scale(.x)))
+weather_norm  
 
 weather_norm
 ```
@@ -613,20 +583,15 @@ Any thoughts?
 Let's try 2.  
 
 ```{r kmeans model }
-mod_km <- kmeans(weather_norm, centers = 6, iter.max = 10, nstart = 10)
+mod_km 
 
-mod_km$cluster
+mod_km
 ```
 
 Since the choice of k can be subjective, we will need to find an objective way to select the value of k that most properly represents our dataset.  
 
 ```{r choosing k - total error}
 # Total error x k
-
-fviz_nbclust(weather_norm,
-             method = "wss",
-             k.max = 10,
-             FUNcluster = kmeans)
 
 ```
 
@@ -646,19 +611,14 @@ silhouette: k=4
 Let's go with 4 clusters.  
 
 ```{r mod_km4 }
-mod_km4 <- kmeans(weather_norm, 
-                  centers = 4,
-                  nstart = 10)
+mod_km4 
 
 mod_km4
 ```
 
 How many observations per cluster?
 ```{r}
-weather %>% 
-  mutate(cluster = mod_km4$cluster, .before = year) %>% 
-  group_by(cluster) %>% 
-  summarise(n = n())
+
 ```
 
 Now how can we visually inspect the resutls of k-means?  
@@ -677,11 +637,11 @@ weather %>%
              y = value, 
              color = cluster))+
     geom_boxplot(show.legend = F)+
-  facet_wrap(~name, scales = "free_y", ncol = 10)
+  facet_wrap(~name, scales = "free_y", ncol = 6)
 
 ggsave("../output/clustervalidation.png",
-       width = 20,
-       height = 15)  
+       width = 10,
+       height = 20)  
 
 ```
   
@@ -693,8 +653,7 @@ We could actually run ANOVA models for each original variable of the form
 and extract cluster mean and pairwise comparison to understand what variables had significant differences among clusters.  
 
 ```{r kmeans PCA plot}
-fviz_cluster(mod_km4,
-             data = weather_norm)
+
 ```
   
 Notice how, behind the scenes, the fviz_cluster function ran a PCA and is showing us a plot with PCs 1 and 2 on the axis (same result as we obtained on the PCA analysis).   
